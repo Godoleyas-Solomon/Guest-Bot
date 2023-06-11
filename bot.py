@@ -123,31 +123,92 @@ def list_checked_guests(update: Update, context: CallbackContext):
         guests = c.execute("SELECT * FROM guests WHERE checked=1 ORDER BY first_name").fetchall()
         if guests:
             message = "```\n"
-            message += "Code | First Name   | Last Name    | Family     | Checked\n"
-            message += "-----|--------------|--------------|------------|--------\n"
+            message += "Code | First Name   | Last Name    | Family     \n"
+            message += "-----|--------------|--------------|------------\n"
             for guest in guests:
                 code = guest[1]
                 first_name = guest[2]
                 last_name = guest[3]
                 family = guest[4] if guest[4] else "None"
-                checked = "✅"
-                message += f"{code} | {first_name:<12} | {last_name:<12} | {family:<10} | {checked}\n"
+                message += f"{code} | {first_name:<12} | {last_name:<12} | {family:<10}\n"
             message += "```"
-            context.bot.sendMessage(chat_id=update.message.chat_id, text=message, parse_mode='markdown')
+            context.bot.sendMessage(chat_id=update.message.chat_id, text=message,
+                                     parse_mode='markdown')
         else:
-            context.bot.sendMessage(chat_id=update.message.chat_id, text="No checked guests found.")
+            context.bot.sendMessage(chat_id=update.message.chat_id, text="No guests have been checked in.")
+
+
+def add_family(update: Update, context: CallbackContext):
+    args = context.args
+    if len(args) < 2 or len(args) > 3:
+        context.bot.sendMessage(chat_id=update.message.chat_id,
+                                 text="Invalid number of arguments. Format: /addfamily code first name last name")
+        return
+
+    code = args[0]
+    family_name = args[1]
+    last_name = args[2] if len(args) == 3 else ""
+
+    with sqlite3.connect('guests.sqlite3') as conn:
+        c = conn.cursor()
+        guest = c.execute("SELECT * FROM guests WHERE code=?", (code,)).fetchone()
+        if guest:
+            if guest[4]:
+                family = guest[4] + ", " + family_name + " " + last_name
+            else:
+                family = family_name + " " + last_name
+            c.execute("UPDATE guests SET family=? WHERE code=?", (family, code))
+            conn.commit()
+            context.bot.sendMessage(chat_id=update.message.chat_id,
+                                     text=f"Family member '{family_name} {last_name}' added to guest with code '{code}'")
+        else:
+            context.bot.sendMessage(chat_id=update.message.chat_id,
+                                     text=f"Guest with code '{code}' not found.")
+            
+
+def delete_family(update: Update, context: CallbackContext):
+    args = context.args
+    if len(args) < 2:
+        context.bot.sendMessage(chat_id=update.message.chat_id,
+                                 text="Invalid number of arguments. Format: /delfamily code family name")
+        return
+
+    code = args[0]
+    family_name = args[1]
+
+    with sqlite3.connect('guests.sqlite3') as conn:
+        c = conn.cursor()
+        guest = c.execute("SELECT * FROM guests WHERE code=?", (code,)).fetchone()
+        if guest:
+            if guest[4]:
+                family_members = guest[4].split(", ")
+                updated_family_members = [m for m in family_members if m != family_name]
+                updated_family = ", ".join(updated_family_members)
+                c.execute("UPDATE guests SET family=? WHERE code=?", (updated_family, code))
+                conn.commit()
+                context.bot.sendMessage(chat_id=update.message.chat_id,
+                                         text=f"Family member '{family_name}' removed from guest with code '{code}'")
+            else:
+                context.bot.sendMessage(chat_id=update.message.chat_id,
+                                         text=f"No family members found for guest with code '{code}'")
+        else:
+            context.bot.sendMessage(chat_id=update.message.chat_id,
+                                     text=f"Guest with code '{code}' not found.")
 
 
 def main():
-    updater = Updater(TOKEN, request_kwargs={
-                      'read_timeout': 20, 'connect_timeout': 20}, use_context=True)
+    updater = Updater(TOKEN, use_context=True)
+
     dp = updater.dispatcher
 
-    dp.add_handler(MessageHandler(Filters.photo, decode_qr))
-    dp.add_handler(CommandHandler('start', start))
-    dp.add_handler(CommandHandler('list', list_guests))
-    dp.add_handler(CommandHandler('listchecked', list_checked_guests))
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("list", list_guests))
+    dp.add_handler(CommandHandler("listchecked", list_checked_guests))
+    dp.add_handler(CommandHandler("addfamily", add_family, pass_args=True))
+    dp.add_handler(CommandHandler("delfamily", delete_family, pass_args=True))
     dp.add_handler(CallbackQueryHandler(check_guest))
+
+    dp.add_handler(MessageHandler(Filters.photo, decode_qr))
 
     updater.start_polling()
     updater.idle()
