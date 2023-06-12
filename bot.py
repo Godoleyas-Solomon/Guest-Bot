@@ -103,103 +103,121 @@ def start(update, context):
 
 
 def list_guests(update: Update, context: CallbackContext):
-    with sqlite3.connect('guests.sqlite3') as conn:
-        c = conn.cursor()
-        guests = c.execute("SELECT * FROM guests ORDER BY first_name").fetchall()
-        if guests:
-            message = "```\n"
-            message += "Code | First Name   | Last Name    | Family     | Checked\n"
-            message += "-----|--------------|--------------|------------|--------\n"
-            for guest in guests:
-                code = guest[1]
-                first_name = guest[2]
-                last_name = guest[3]
-                family = guest[4] if guest[4] else "None"
-                checked = "✅" if guest[5] else "❌"
-                message += f"{code} | {first_name:<12} | {last_name:<12} | {family:<10} | {checked}\n"
-            message += "```"
-            context.bot.sendMessage(chat_id=update.message.chat_id, text=message, parse_mode='markdown')
-        else:
-            context.bot.sendMessage(chat_id=update.message.chat_id, text="No guests found.")
+    user = update.message.from_user
+    if user.id in config.admins:
+        with sqlite3.connect('guests.sqlite3') as conn:
+            c = conn.cursor()
+            guests = c.execute("SELECT * FROM guests ORDER BY first_name").fetchall()
+            if guests:
+                message = "```\n"
+                message += "Code | First Name   | Last Name    | Family     | Checked\n"
+                message += "-----|--------------|--------------|------------|--------\n"
+                for guest in guests:
+                    code = guest[1]
+                    first_name = guest[2]
+                    last_name = guest[3]
+                    family = guest[4] if guest[4] else "None"
+                    checked = "✅" if guest[5] else "❌"
+                    message += f"{code} | {first_name:<12} | {last_name:<12} | {family:<10} | {checked}\n"
+                message += "```"
+                context.bot.sendMessage(chat_id=update.message.chat_id, text=message, parse_mode='markdown')
+            else:
+                context.bot.sendMessage(chat_id=update.message.chat_id, text="No guests found.")
+    else:
+        context.bot.sendMessage(chat_id=update.message.chat_id, text="You are not authorized to access the list")
 
 
 def list_checked_guests(update: Update, context: CallbackContext):
-    with sqlite3.connect('guests.sqlite3') as conn:
-        c = conn.cursor()
-        guests = c.execute("SELECT * FROM guests WHERE checked=1 ORDER BY first_name").fetchall()
-        if guests:
-            message = "```\n"
-            message += "Code | First Name   | Last Name    | Family     \n"
-            message += "-----|--------------|--------------|------------\n"
-            for guest in guests:
-                code = guest[1]
-                first_name = guest[2]
-                last_name = guest[3]
-                family = guest[4] if guest[4] else "None"
-                message += f"{code} | {first_name:<12} | {last_name:<12} | {family:<10}\n"
-            message += "```"
-            context.bot.sendMessage(chat_id=update.message.chat_id, text=message,
-                                     parse_mode='markdown')
-        else:
-            context.bot.sendMessage(chat_id=update.message.chat_id, text="No guests have been checked in.")
+    user = update.message.from_user
+    if user.id in config.admins:
+        with sqlite3.connect('guests.sqlite3') as conn:
+            c = conn.cursor()
+            guests = c.execute("SELECT * FROM guests WHERE checked=1 ORDER BY first_name").fetchall()
+            if guests:
+                message = "```\n"
+                message += "Code | First Name   | Last Name    | Family     \n"
+                message += "-----|--------------|--------------|------------\n"
+                for guest in guests:
+                    code = guest[1]
+                    first_name = guest[2]
+                    last_name = guest[3]
+                    family = guest[4] if guest[4] else "None"
+                    message += f"{code} | {first_name:<12} | {last_name:<12} | {family:<10}\n"
+                message += "```"
+                context.bot.sendMessage(chat_id=update.message.chat_id, text=message,
+                                        parse_mode='markdown')
+            else:
+                context.bot.sendMessage(chat_id=update.message.chat_id, text="No guests have been checked in.")
+    else:
+        context.bot.sendMessage(chat_id=update.message.chat_id, text="You are not authorized to access the list")
 
 
 def add_family(update: Update, context: CallbackContext):
-    args = context.args
-    if len(args) < 2 or len(args) > 3:
-        context.bot.sendMessage(chat_id=update.message.chat_id,
-                                 text="Invalid number of arguments. Format: /addfamily code first name last name")
-        return
-
-    code = args[0]
-    family_name = args[1]
-    last_name = args[2] if len(args) == 3 else ""
-
-    with sqlite3.connect('guests.sqlite3') as conn:
-        c = conn.cursor()
-        guest = c.execute("SELECT * FROM guests WHERE code=?", (code,)).fetchone()
-        if guest:
-            if guest[4]:
-                family = guest[4] + ", " + family_name + " " + last_name
-            else:
-                family = family_name + " " + last_name
-            c.execute("UPDATE guests SET family=? WHERE code=?", (family, code))
-            conn.commit()
+    user = update.message.from_user
+    if user.id in config.admins:
+        args = context.args
+        if len(args) < 2 or len(args) > 3:
             context.bot.sendMessage(chat_id=update.message.chat_id,
-                                     text=f"Family member '{family_name} {last_name}' added to guest with code '{code}'")
-        else:
-            context.bot.sendMessage(chat_id=update.message.chat_id,
-                                     text=f"Guest with code '{code}' not found.")
-            
+                                    text="Invalid number of arguments. Format: /addfamily code first name last name")
+            return
 
-def delete_family(update: Update, context: CallbackContext):
-    args = context.args
-    if len(args) < 2:
-        context.bot.sendMessage(chat_id=update.message.chat_id,
-                                 text="Invalid number of arguments. Format: /delfamily code family name")
-        return
+        code = args[0]
+        family_name = args[1]
+        last_name = args[2] if len(args) == 3 else ""
 
-    code = args[0]
-    family_name = args[1]
-
-    with sqlite3.connect('guests.sqlite3') as conn:
-        c = conn.cursor()
-        guest = c.execute("SELECT * FROM guests WHERE code=?", (code,)).fetchone()
-        if guest:
-            if guest[4]:
-                family_members = guest[4].split(", ")
-                updated_family_members = [m for m in family_members if m != family_name]
-                updated_family = ", ".join(updated_family_members)
-                c.execute("UPDATE guests SET family=? WHERE code=?", (updated_family, code))
+        with sqlite3.connect('guests.sqlite3') as conn:
+            c = conn.cursor()
+            guest = c.execute("SELECT * FROM guests WHERE code=?", (code,)).fetchone()
+            if guest:
+                if guest[4]:
+                    family = guest[4] + ", " + family_name + " " + last_name
+                else:
+                    family = family_name + " " + last_name
+                c.execute("UPDATE guests SET family=? WHERE code=?", (family, code))
                 conn.commit()
                 context.bot.sendMessage(chat_id=update.message.chat_id,
-                                         text=f"Family member '{family_name}' removed from guest with code '{code}'")
+                                        text=f"Family member '{family_name} {last_name}' added to guest with code '{code}'")
             else:
                 context.bot.sendMessage(chat_id=update.message.chat_id,
-                                         text=f"No family members found for guest with code '{code}'")
-        else:
+                                        text=f"Guest with code '{code}' not found.")
+    else:
+        context.bot.sendMessage(chat_id=update.message.chat_id, text="You are not authorized to access the list")
+
+
+
+def delete_family(update: Update, context: CallbackContext):
+    user = update.message.from_user
+    if user.id in config.admins:
+        args = context.args
+        if len(args) < 2:
             context.bot.sendMessage(chat_id=update.message.chat_id,
-                                     text=f"Guest with code '{code}' not found.")
+                                    text="Invalid number of arguments. Format: /delfamily code family name")
+            return
+
+        code = args[0]
+        family_name = args[1]
+
+        with sqlite3.connect('guests.sqlite3') as conn:
+            c = conn.cursor()
+            guest = c.execute("SELECT * FROM guests WHERE code=?", (code,)).fetchone()
+            if guest:
+                if guest[4]:
+                    family_members = guest[4].split(", ")
+                    updated_family_members = [m for m in family_members if m != family_name]
+                    updated_family = ", ".join(updated_family_members)
+                    c.execute("UPDATE guests SET family=? WHERE code=?", (updated_family, code))
+                    conn.commit()
+                    context.bot.sendMessage(chat_id=update.message.chat_id,
+                                            text=f"Family member '{family_name}' removed from guest with code '{code}'")
+                else:
+                    context.bot.sendMessage(chat_id=update.message.chat_id,
+                                            text=f"No family members found for guest with code '{code}'")
+            else:
+                context.bot.sendMessage(chat_id=update.message.chat_id,
+                                        text=f"Guest with code '{code}' not found.")
+    else:
+        context.bot.sendMessage(chat_id=update.message.chat_id, text="You are not authorized to access the list")
+
 
 
 def main():
