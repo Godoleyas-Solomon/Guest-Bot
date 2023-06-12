@@ -95,7 +95,10 @@ def check_guest(update: Update, context: CallbackContext):
 def start(update, context):
     user = update.message.from_user
     print(user)
-    message = f'Hello {user.first_name}.'
+    if user.id in config.admins:
+        message = f'Hello Mr Stark.'
+    else:
+        message = f'Hello {user.first_name}.'
     context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
 
