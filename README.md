@@ -19,8 +19,7 @@ To generate a QR code for a guest, run the following command:
 
 ```
 bash
-Copy
-python qr_maker.py <guest_name> <family_members>
+python qr_maker.py
 ```
 *<guest_name>*: The name of the guest.
 
@@ -49,11 +48,13 @@ To use the Telegram bot, follow these steps:
 
 ```
 1. Create a new bot using the BotFather on Telegram.
-2. Copy the bot token and insert it into the TELEGRAM_TOKEN variable in the bot.py file.
-3. Start the bot using the following command:
-4. Open terminal/command prompt
-5. Insert python bot.py
-6. Send a QR code image to the bot. The bot will decode the QR code and check if the guest is in the database. If the guest is found, the bot will display their name, family members, and whether they have checked in or not. If they haven't checked in, the bot will provide a button that allows the user to check them in.
+2. Copy the bot token.
+3. Locate Guest-Bot folder on your terminal.
+4. Make a config.py file with a variable and a list.
+4.1 The variable should be a string and its name should be token
+4.2 The list should include the ids of the admins.
+5. Start the bot using the command *python bot.py*.
+7. Send a QR code image to the bot. The bot will decode the QR code and check if the guest is in the database. If the guest is found, the bot will display their name, family members, and whether they have checked in or not. If they haven't checked in, the bot will provide a button that allows the user to check them in.
 ```
 
 Plans for Future Development:
