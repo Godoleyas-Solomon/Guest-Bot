@@ -93,7 +93,10 @@ def check_guest(update: Update, context: CallbackContext):
 
 
 def start(update, context):
-    context.bot.send_message(chat_id=update.effective_chat.id, text="Bot is running")
+    user = update.message.from_user
+    print(user)
+    message = f'Hello {user.first_name}.'
+    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
 
 def list_guests(update: Update, context: CallbackContext):
